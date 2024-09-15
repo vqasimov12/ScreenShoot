@@ -2,6 +2,7 @@
 using System.Drawing.Imaging;
 using System.Net;
 using System.Net.Sockets;
+using System.Text;
 using System.Timers;
 
 
@@ -9,44 +10,69 @@ var client = new UdpClient();
 var ep = new IPEndPoint(IPAddress.Loopback, 27001);
 var Timer = new System.Timers.Timer();
 var path = "Image.png";
-_ = Task.Run(() =>
-{
-    Timer.Interval = 3000;
-    Timer.Elapsed += ScreenShot;
-    Timer.AutoReset = true;
-    Timer.Enabled = true;
-    Timer.Start();
-});
+
 void ScreenShot(object? source, ElapsedEventArgs? e)
 {
-    using (Bitmap bitmap = new Bitmap(1920, 1080))
+    object a = new();
+    lock (a)
     {
-        using Graphics g = Graphics.FromImage(bitmap);
-        g.CopyFromScreen(Point.Empty, Point.Empty, new Size(1920, 1080));
-        bitmap.Save(path, ImageFormat.Png);
-       
+        try
+        {
+            using (Bitmap bitmap = new Bitmap(1920, 1080))
+            {
+                using Graphics g = Graphics.FromImage(bitmap);
+                g.CopyFromScreen(Point.Empty, Point.Empty, new Size(1920, 1080));
+                bitmap.Save(path, ImageFormat.Png);
+            }
+
+            byte[] bytes;
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))
+            {
+                int bufferSize = 1024; 
+                byte[] buffer = new byte[bufferSize];
+                int bytesRead;
+
+                while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    client.Send(buffer, bytesRead, ep);
+                }
+
+                byte endMarker = 0x00;
+                client.Send(new byte[] { endMarker }, 1, ep);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
     }
 }
 
-while (true)
+
+_ = Task.Run(() =>
 {
-    try
+    var endPoint = new IPEndPoint(IPAddress.Any, 0);
+    var reciever = new UdpClient(27000);
+    while (true)
     {
-        if (!File.Exists(path))
-            continue;
-        using var fs = new FileStream(path, FileMode.Open, FileAccess.Read);
-        int len = 22;
-        var bytes = new byte[len];
-        var fileSize = fs.Length;
-        do
+        try
         {
-            len = fs.Read(bytes, 0, len);
-            client.Send(bytes, ep);
-        } while (len > 0);
-        File.Delete(path);
+            var bytes = reciever.Receive(ref endPoint);
+            var str = Encoding.UTF8.GetString(bytes);
+            if (str == "Start")
+            {
+                Timer.Stop();
+                Timer.Elapsed -= ScreenShot;
+                Timer.Elapsed += ScreenShot;
+                Timer.Interval = 3000;
+                Timer.AutoReset = true;
+                Timer.Start();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine(ex.Message);
+        }
     }
-    catch (Exception e)
-    {
-        Console.WriteLine(e.Message);
-    }
-}
+});
+Console.ReadKey();
