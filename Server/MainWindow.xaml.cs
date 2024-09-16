@@ -2,12 +2,9 @@
 using System.Net;
 using System.Windows;
 using System.IO;
-using System.Windows.Controls;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Threading;
-using static System.Net.Mime.MediaTypeNames;
-using System.Windows.Media.Imaging;
 using System.Text;
 
 namespace Server;
@@ -18,43 +15,56 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     UdpClient client = new(27001);
     IPEndPoint ep = new(IPAddress.Any, 0);
     private string imagePath;
-
     public string ImagePath { get => imagePath; set { imagePath = value; OnPropertyChanged(); } }
+    DispatcherTimer _timer;
     public MainWindow()
     {
 
         InitializeComponent();
         DataContext = this;
-
         var segment = new List<byte>();
+        _timer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(0.5)
+        };
+        _timer.Tick += ChangeImage;
+        _timer.Start();
         _ = Task.Run(() =>
         {
-            while (true)
+            byte endMarker = 0x00;
+            try
             {
-                try
+                //var prevPath = path;
+                //path = $"{Guid.NewGuid()}.png";
+                //if (File.Exists(prevPath))
+                //    File.Delete(prevPath);
+
+                while (true)
                 {
-                    byte endMarker = 0x00;
                     var bytes = client.Receive(ref ep);
                     if (bytes.Length == 1 && bytes[0] == endMarker)
                     {
-                        File.WriteAllBytes(path, segment.ToArray());
+                        using var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write);
+                        fileStream.Write(segment.ToArray(), 0, segment.Count);
                         segment.Clear();
+
                     }
                     else
                         segment.AddRange(bytes);
                 }
-                catch (Exception e)
-                {
-                    Console.WriteLine(e.Message);
-                }
+
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
             }
         });
+
     }
 
-    private void ChageImage(object? sender, System.Timers.ElapsedEventArgs e)
+    private void ChangeImage(object? sender, EventArgs e)
     {
-        ImagePath = null;
-        ImagePath = "image.png";
+        //ImagePath = path;
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -67,11 +77,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-
-            var UdpSender = new UdpClient(27000);
-            var ep = new IPEndPoint(IPAddress.Loopback, 27000);
+            var client = new UdpClient();
+            var connectEp = new IPEndPoint(IPAddress.Loopback, 27000);
             var bytes = Encoding.UTF8.GetBytes("Start");
-            UdpSender.Send(bytes, bytes.Length, ep);
+            client.Send(bytes, bytes.Length, connectEp);
         }
         catch (Exception ex)
         {

@@ -28,7 +28,7 @@ void ScreenShot(object? source, ElapsedEventArgs? e)
             byte[] bytes;
             using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read))
             {
-                int bufferSize = 1024; 
+                int bufferSize = 1024;
                 byte[] buffer = new byte[bufferSize];
                 int bytesRead;
 
