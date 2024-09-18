@@ -6,6 +6,9 @@ using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using System.Windows.Threading;
 using System.Text;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 
 namespace Server;
 
@@ -47,7 +50,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                         using var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write);
                         fileStream.Write(segment.ToArray(), 0, segment.Count);
                         segment.Clear();
-
+                        Image img = new();
+                        Dispatcher.Invoke(() => { ImageBox.Source = ByteArrayToImageSource(segment.ToArray()); });
                     }
                     else
                         segment.AddRange(bytes);
@@ -61,7 +65,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         });
 
     }
-
+    public BitmapImage ByteArrayToImageSource(byte[] byteArray)
+    {
+        using (var stream = new MemoryStream(byteArray))
+        {
+            var image = new BitmapImage();
+            image.BeginInit();
+            image.CacheOption = BitmapCacheOption.OnLoad;
+            image.StreamSource = stream;
+            image.EndInit();
+            image.Freeze();
+            return image;
+        }
+    }
     private void ChangeImage(object? sender, EventArgs e)
     {
         //ImagePath = path;
