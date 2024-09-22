@@ -37,21 +37,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             byte endMarker = 0x00;
             try
             {
-                //var prevPath = path;
-                //path = $"{Guid.NewGuid()}.png";
-                //if (File.Exists(prevPath))
-                //    File.Delete(prevPath);
-
+                //var prevPath = pat
+                path = $"{Guid.NewGuid()}.jpeg";
                 while (true)
                 {
                     var bytes = client.Receive(ref ep);
                     if (bytes.Length == 1 && bytes[0] == endMarker)
                     {
-                        using var fileStream = new FileStream(path, FileMode.Create, FileAccess.Write);
+                        using var fileStream = new FileStream(path, FileMode.OpenOrCreate, FileAccess.Write);
                         fileStream.Write(segment.ToArray(), 0, segment.Count);
                         segment.Clear();
-                        Image img = new();
-                        Dispatcher.Invoke(() => { ImageBox.Source = ByteArrayToImageSource(segment.ToArray()); });
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            img.Source = new BitmapImage(new Uri(Path.GetFullPath(path), UriKind.RelativeOrAbsolute));
+                        });
                     }
                     else
                         segment.AddRange(bytes);
